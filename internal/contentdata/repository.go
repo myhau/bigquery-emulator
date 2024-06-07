@@ -78,6 +78,54 @@ func (r *Repository) routinePath(projectID, datasetID, routineID string) string 
 	return strings.Join(routinePath, ".")
 }
 
+func (r *Repository) AlterTable(ctx context.Context, tx *connection.Tx, oldTable *bigqueryv2.Table, newTable *bigqueryv2.Table) error {
+	if err := tx.ContentRepoMode(); err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.MetadataRepoMode()
+	}()
+
+	ref := newTable.TableReference
+	if ref == nil {
+		return fmt.Errorf("TableReference is nil")
+	}
+	tablePath := r.tablePath(ref.ProjectId, ref.DatasetId, ref.TableId)
+
+	// Diff the old and new table schemas
+	alterStatements := make([]string, 0)
+	oldFieldMap := make(map[string]*bigqueryv2.TableFieldSchema)
+	for _, field := range oldTable.Schema.Fields {
+		oldFieldMap[field.Name] = field
+	}
+
+	for _, newField := range newTable.Schema.Fields {
+		oldField, exists := oldFieldMap[newField.Name]
+		if !exists {
+			// New field added
+			alterStatements = append(alterStatements, fmt.Sprintf("ADD COLUMN `%s` %s", newField.Name, r.encodeSchemaField(newField)))
+		} else if !reflect.DeepEqual(oldField, newField) {
+			// Field modified
+			alterStatements = append(alterStatements, fmt.Sprintf("ALTER COLUMN `%s` SET DATA TYPE %s", newField.Name, r.encodeSchemaField(newField)))
+		}
+		delete(oldFieldMap, newField.Name)
+	}
+
+	// Remaining fields in oldFieldMap are deleted fields
+	for fieldName := range oldFieldMap {
+		alterStatements = append(alterStatements, fmt.Sprintf("DROP COLUMN `%s`", fieldName))
+	}
+
+	if len(alterStatements) > 0 {
+		query := fmt.Sprintf("ALTER TABLE `%s` %s", tablePath, strings.Join(alterStatements, ", "))
+		if _, err := tx.Tx().ExecContext(ctx, query); err != nil {
+			return fmt.Errorf("failed to alter table %s: %w", query, err)
+		}
+	}
+
+	return nil
+}
+
 func (r *Repository) CreateTable(ctx context.Context, tx *connection.Tx, table *bigqueryv2.Table) error {
 	if err := tx.ContentRepoMode(); err != nil {
 		return err
