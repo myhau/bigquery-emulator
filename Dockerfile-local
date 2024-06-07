@@ -16,6 +16,8 @@ RUN xx-apt install -y musl-dev gcc libstdc++-12-dev
 
 ARG VERSION
 
+COPY certs.d/* /etc/ssl/certs/
+
 WORKDIR /work
 
 COPY . ./
