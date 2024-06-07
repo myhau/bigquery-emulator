@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/goccy/go-json"
+	"github.com/goccy/go-zetasqlite"
 	"go.uber.org/zap"
 	bigqueryv2 "google.golang.org/api/bigquery/v2"
 	"google.golang.org/api/iterator"
@@ -31,6 +33,7 @@ import (
 	"github.com/goccy/bigquery-emulator/internal/metadata"
 	internaltypes "github.com/goccy/bigquery-emulator/internal/types"
 	"github.com/goccy/bigquery-emulator/types"
+	"github.com/segmentio/parquet-go"
 )
 
 func errorResponse(ctx context.Context, w http.ResponseWriter, e *ServerError) {
