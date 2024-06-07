@@ -78,7 +78,7 @@ func (r *Repository) routinePath(projectID, datasetID, routineID string) string 
 	return strings.Join(routinePath, ".")
 }
 
-func (r *Repository) AlterTable(ctx context.Context, tx *connection.Tx, oldTable *bigqueryv2.Table, newSchema *bigqueryv2.TableSchema) error {
+func (r *Repository) AlterTable(ctx context.Context, tx *connection.Tx, table *bigqueryv2.Table, newSchema *bigqueryv2.TableSchema) error {
 	if err := tx.ContentRepoMode(); err != nil {
 		return err
 	}
@@ -86,34 +86,33 @@ func (r *Repository) AlterTable(ctx context.Context, tx *connection.Tx, oldTable
 		_ = tx.MetadataRepoMode()
 	}()
 
-	ref := oldTable.TableReference
+	ref := table.TableReference
 	if ref == nil {
 		return fmt.Errorf("TableReference is nil")
 	}
 	tablePath := r.tablePath(ref.ProjectId, ref.DatasetId, ref.TableId)
 
-	// Diff the old and new table schemas
 	alterStatements := make([]string, 0)
 	oldFieldMap := make(map[string]*bigqueryv2.TableFieldSchema)
-	for _, field := range oldTable.Schema.Fields {
+	for _, field := range table.Schema.Fields {
 		oldFieldMap[field.Name] = field
 	}
 
 	for _, newField := range newSchema.Fields {
 		oldField, exists := oldFieldMap[newField.Name]
 		if !exists {
-			// New field added
 			alterStatements = append(alterStatements, fmt.Sprintf("ADD COLUMN `%s` %s", newField.Name, r.encodeSchemaField(newField)))
 		} else if !reflect.DeepEqual(oldField, newField) {
-			// Field modified
-			alterStatements = append(alterStatements, fmt.Sprintf("ALTER COLUMN `%s` SET DATA TYPE %s", newField.Name, r.encodeSchemaField(newField)))
+			// FIXME: what about field description?
+			return fmt.Errorf("changing existing field is not allowed")
 		}
 		delete(oldFieldMap, newField.Name)
 	}
 
 	// Remaining fields in oldFieldMap are deleted fields
-	for fieldName := range oldFieldMap {
-		alterStatements = append(alterStatements, fmt.Sprintf("DROP COLUMN `%s`", fieldName))
+	if len(oldFieldMap) > 0 {
+		// TODO: better error?
+		return fmt.Errorf("removing fields is not allowed")
 	}
 
 	if len(alterStatements) > 0 {
