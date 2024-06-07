@@ -8,7 +8,7 @@ endif
 emulator/build-debug:
 	CGO_ENABLED=1 CXX=clang++ go build -o bigquery-emulator \
 		-gcflags "all=-N -l" \
-		-ldflags='-s -w -X main.version=${VERSION} -X main.revision=${REVISION} ${STATIC_LINK_FLAG}' \
+		-ldflags='-X main.version=${VERSION} -X main.revision=${REVISION} ${STATIC_LINK_FLAG}' \
 		./cmd/bigquery-emulator
 
 

@@ -2683,6 +2683,10 @@ func (h *tablesListHandler) Handle(ctx context.Context, r *tablesListRequest) (*
 	}, nil
 }
 
+type MetadataPatch struct {
+	Schema *bigqueryv2.TableSchema `json:"schema,omitempty"`
+}
+
 func (h *tablesPatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	server := serverFromContext(ctx)
@@ -2695,17 +2699,29 @@ func (h *tablesPatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, found := newTable["schema"]; found {
-		errorResponse(ctx, w, errInvalid("schema updates unsupported"))
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(&newTable); err != nil {
+		errorResponse(ctx, w, errInvalid(err.Error()))
+		return
+	}
+	var newTableTyped MetadataPatch
+	if err := json.NewDecoder(&buf).Decode(&newTableTyped); err != nil {
+		errorResponse(ctx, w, errInvalid(err.Error()))
 		return
 	}
 
+	//if _, found := newTable["schema"]; found {
+	//	errorResponse(ctx, w, errInvalid("schema updates unsupported"))
+	//	return
+	//}
+
 	res, err := h.Handle(ctx, &tablesPatchRequest{
-		server:           server,
-		project:          project,
-		dataset:          dataset,
-		table:            table,
-		newTableMetadata: newTable,
+		server:                server,
+		project:               project,
+		dataset:               dataset,
+		table:                 table,
+		newTableMetadata:      newTable,
+		newTableMetadataTyped: &newTableTyped,
 	})
 
 	if err != nil {
@@ -2717,11 +2733,12 @@ func (h *tablesPatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type tablesPatchRequest struct {
-	server           *Server
-	project          *metadata.Project
-	dataset          *metadata.Dataset
-	table            *metadata.Table
-	newTableMetadata map[string]interface{}
+	server                *Server
+	project               *metadata.Project
+	dataset               *metadata.Dataset
+	table                 *metadata.Table
+	newTableMetadata      map[string]interface{}
+	newTableMetadataTyped *MetadataPatch
 }
 
 func (h *tablesPatchHandler) Handle(ctx context.Context, r *tablesPatchRequest) (*bigqueryv2.Table, error) {
@@ -2735,6 +2752,14 @@ func (h *tablesPatchHandler) Handle(ctx context.Context, r *tablesPatchRequest) 
 	}
 	defer tx.RollbackIfNotCommitted()
 	if err := r.table.Update(ctx, tx.Tx(), r.newTableMetadata); err != nil {
+		return nil, err
+	}
+	content, err := r.table.Content()
+	if err != nil {
+		return nil, err
+	}
+	err = r.server.contentRepo.AlterTable(ctx, tx, content, r.newTableMetadataTyped.Schema)
+	if err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

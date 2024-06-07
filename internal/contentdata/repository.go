@@ -78,7 +78,7 @@ func (r *Repository) routinePath(projectID, datasetID, routineID string) string 
 	return strings.Join(routinePath, ".")
 }
 
-func (r *Repository) AlterTable(ctx context.Context, tx *connection.Tx, oldTable *bigqueryv2.Table, newTable *bigqueryv2.Table) error {
+func (r *Repository) AlterTable(ctx context.Context, tx *connection.Tx, oldTable *bigqueryv2.Table, newSchema *bigqueryv2.TableSchema) error {
 	if err := tx.ContentRepoMode(); err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (r *Repository) AlterTable(ctx context.Context, tx *connection.Tx, oldTable
 		_ = tx.MetadataRepoMode()
 	}()
 
-	ref := newTable.TableReference
+	ref := oldTable.TableReference
 	if ref == nil {
 		return fmt.Errorf("TableReference is nil")
 	}
@@ -99,7 +99,7 @@ func (r *Repository) AlterTable(ctx context.Context, tx *connection.Tx, oldTable
 		oldFieldMap[field.Name] = field
 	}
 
-	for _, newField := range newTable.Schema.Fields {
+	for _, newField := range newSchema.Fields {
 		oldField, exists := oldFieldMap[newField.Name]
 		if !exists {
 			// New field added
