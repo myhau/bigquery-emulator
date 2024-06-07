@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/csv"
+	"github.com/goccy/bigquery-emulator/internal/contentdata"
 	"log"
 
 	//"encoding/json"
@@ -2726,7 +2727,7 @@ func (h *tablesPatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		errorResponse(ctx, w, errInternalError(err.Error()))
+		errorResponse(ctx, w, err)
 		return
 	}
 	encodeResponse(ctx, w, res)
@@ -2742,33 +2743,40 @@ type tablesPatchRequest struct {
 	newTableMetadataTyped *MetadataPatch
 }
 
-func (h *tablesPatchHandler) Handle(ctx context.Context, r *tablesPatchRequest) (*bigqueryv2.Table, error) {
+func (h *tablesPatchHandler) Handle(ctx context.Context, r *tablesPatchRequest) (*bigqueryv2.Table, *ServerError) {
 	conn, err := r.server.connMgr.Connection(ctx, r.project.ID, r.dataset.ID)
 	if err != nil {
-		return nil, err
+		return nil, errInternalError(err.Error())
 	}
 	tx, err := conn.Begin(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errInternalError(err.Error())
 	}
 	defer tx.RollbackIfNotCommitted()
-	if err := r.table.Update(ctx, tx.Tx(), r.newTableMetadata); err != nil {
-		return nil, err
-	}
 	content, err := r.table.Content()
 	if err != nil {
-		return nil, err
+		return nil, errInternalError(err.Error())
 	}
-	err = r.server.contentRepo.AlterTable(ctx, tx, content, r.newTableMetadataTyped.Schema)
-	if err != nil {
-		return nil, err
+	contentDataErr := r.server.contentRepo.AlterTable(ctx, tx, content, r.newTableMetadataTyped.Schema)
+	if contentDataErr != nil {
+		switch contentDataErr.ErrorReason {
+		case contentdata.AlterTableExistingFieldChanged:
+			return nil, withDebugInfo(errInvalid(contentDataErr.Message), contentDataErr.Cause)
+		case contentdata.AlterTableExistingFieldRemoved:
+			return nil, withDebugInfo(errInvalid(contentDataErr.Message), contentDataErr.Cause)
+		default:
+			return nil, withDebugInfo(errInternalError(""), contentDataErr.Cause)
+		}
+	}
+	if err := r.table.Update(ctx, tx.Tx(), r.newTableMetadata); err != nil {
+		return nil, errInternalError(err.Error())
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, err
+		return nil, errInternalError(err.Error())
 	}
 	table, err := r.table.Content()
 	if err != nil {
-		return nil, err
+		return nil, errInternalError(err.Error())
 	}
 	return table, nil
 }

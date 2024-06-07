@@ -17,6 +17,7 @@ import (
 	"github.com/goccy/bigquery-emulator/internal/connection"
 	"github.com/goccy/bigquery-emulator/internal/contentdata"
 	"github.com/goccy/bigquery-emulator/internal/metadata"
+	_ "github.com/googleapis/go-sql-spanner"
 	"github.com/gorilla/mux"
 )
 

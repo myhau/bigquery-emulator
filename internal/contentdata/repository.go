@@ -78,17 +78,22 @@ func (r *Repository) routinePath(projectID, datasetID, routineID string) string 
 	return strings.Join(routinePath, ".")
 }
 
-func (r *Repository) AlterTable(ctx context.Context, tx *connection.Tx, table *bigqueryv2.Table, newSchema *bigqueryv2.TableSchema) error {
+func stringReference(ref *bigqueryv2.TableReference) string {
+	return fmt.Sprintf("%s:%s.%s", ref.ProjectId, ref.DatasetId, ref.TableId)
+}
+
+func (r *Repository) AlterTable(ctx context.Context, tx *connection.Tx, table *bigqueryv2.Table, newSchema *bigqueryv2.TableSchema) *ContentDataError {
 	if err := tx.ContentRepoMode(); err != nil {
-		return err
+		return ErrorWithCause(Unknown, err)
 	}
+
 	defer func() {
 		_ = tx.MetadataRepoMode()
 	}()
 
 	ref := table.TableReference
 	if ref == nil {
-		return fmt.Errorf("TableReference is nil")
+		return ErrorWithMessage(Unknown, "TableReference is nil")
 	}
 	tablePath := r.tablePath(ref.ProjectId, ref.DatasetId, ref.TableId)
 
@@ -103,22 +108,29 @@ func (r *Repository) AlterTable(ctx context.Context, tx *connection.Tx, table *b
 		if !exists {
 			alterStatements = append(alterStatements, fmt.Sprintf("ADD COLUMN `%s` %s", newField.Name, r.encodeSchemaField(newField)))
 		} else if !reflect.DeepEqual(oldField, newField) {
+			if oldField.Type != newField.Type {
+				message := fmt.Sprintf(
+					"Provided Schema does not match Table %s. Field %s has changed type from %s to %s",
+					stringReference(table.TableReference), newField.Name, oldField.Type, newField.Type,
+				)
+				return ErrorWithMessage(AlterTableExistingFieldChanged, message)
+			} else {
+				return Error(AlterTableExistingFieldChanged)
+			}
 			// FIXME: what about field description?
-			return fmt.Errorf("changing existing field is not allowed")
+
 		}
 		delete(oldFieldMap, newField.Name)
 	}
 
-	// Remaining fields in oldFieldMap are deleted fields
 	if len(oldFieldMap) > 0 {
-		// TODO: better error?
-		return fmt.Errorf("removing fields is not allowed")
+		return Error(AlterTableExistingFieldRemoved)
 	}
 
 	if len(alterStatements) > 0 {
 		query := fmt.Sprintf("ALTER TABLE `%s` %s", tablePath, strings.Join(alterStatements, ", "))
 		if _, err := tx.Tx().ExecContext(ctx, query); err != nil {
-			return fmt.Errorf("failed to alter table %s: %w", query, err)
+			return ErrorWithCause(Unknown, fmt.Errorf("failed to alter table %s: %w", query, err))
 		}
 	}
 
