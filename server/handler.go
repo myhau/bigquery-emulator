@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
@@ -20,8 +21,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/goccy/go-json"
-	"github.com/goccy/go-zetasqlite"
 	"go.uber.org/zap"
 	bigqueryv2 "google.golang.org/api/bigquery/v2"
 	"google.golang.org/api/iterator"
@@ -32,7 +31,6 @@ import (
 	"github.com/goccy/bigquery-emulator/internal/metadata"
 	internaltypes "github.com/goccy/bigquery-emulator/internal/types"
 	"github.com/goccy/bigquery-emulator/types"
-	"github.com/segmentio/parquet-go"
 )
 
 func errorResponse(ctx context.Context, w http.ResponseWriter, e *ServerError) {
@@ -2728,12 +2726,14 @@ func (h *tablesPatchHandler) Handle(ctx context.Context, r *tablesPatchRequest) 
 		return nil, err
 	}
 	defer tx.RollbackIfNotCommitted()
+	// TODO: the metadata would have to be merged with the existing definition instead of replacing it
 	if err := r.table.Update(ctx, tx.Tx(), tableMetadata); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	// TODO: read the actual content
 	return r.newTable, nil
 }
 

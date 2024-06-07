@@ -205,6 +205,11 @@ var handlers = []*Handler{
 		HTTPMethod: "PUT",
 		Handler:    &tablesUpdateHandler{},
 	},
+	{
+      	Path:       "/projects/{projectId}/datasets/{datasetId}/tables/{tableId}",
+      	HTTPMethod: "POST",
+      	Handler:    &tablesPatchHandler{},
+    },
 }
 
 var (
