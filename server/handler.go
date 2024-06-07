@@ -5,7 +5,9 @@ import (
 	"context"
 	_ "embed"
 	"encoding/csv"
-	"encoding/json"
+	"log"
+
+	//"encoding/json"
 	"errors"
 	"fmt"
 	"html"
@@ -694,6 +696,8 @@ type datasetsInsertRequest struct {
 }
 
 func (h *datasetsInsertHandler) Handle(ctx context.Context, r *datasetsInsertRequest) (*bigqueryv2.DatasetListDatasets, error) {
+	fmt.Printf("Just testing logs printf")
+	log.Printf("Just testing logs log")
 	if r.dataset.DatasetReference == nil {
 		return nil, fmt.Errorf("DatasetReference is nil")
 	}
@@ -2597,6 +2601,8 @@ func createTableMetadata(ctx context.Context, tx *connection.Tx, server *Server,
 }
 
 func (h *tablesInsertHandler) Handle(ctx context.Context, r *tablesInsertRequest) (*bigqueryv2.Table, *ServerError) {
+	fmt.Printf("testing fmt printf")
+	log.Printf("testing log printf")
 	conn, err := r.server.connMgr.Connection(ctx, r.project.ID, r.dataset.ID)
 	if err != nil {
 		return nil, errInternalError(err.Error())
@@ -2729,14 +2735,12 @@ func (h *tablesPatchHandler) Handle(ctx context.Context, r *tablesPatchRequest) 
 		return nil, err
 	}
 	defer tx.RollbackIfNotCommitted()
-	// TODO: the metadata would have to be merged with the existing definition instead of replacing it
 	if err := r.table.Update(ctx, tx.Tx(), tableMetadata); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	// TODO: read the actual content
 	return r.newTable, nil
 }
 
