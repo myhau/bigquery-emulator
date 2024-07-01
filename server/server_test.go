@@ -423,9 +423,15 @@ type TableSchema struct {
 }
 
 type StructType struct {
-	A int
-	B string
-	C float64
+	A      int
+	B      string
+	C      float64
+	Nested *NestedStructType
+}
+
+type NestedStructType struct {
+	D      int
+	Exists bool // this needs to be named "exists" (or like any other reserved keyword) to test escaping
 }
 
 func (s *TableSchema) Save() (map[string]bigquery.Value, string, error) {
@@ -515,12 +521,20 @@ func TestTable(t *testing.T) {
 			A: 4,
 			B: "5",
 			C: 6,
+			Nested: &NestedStructType{
+				D:      2,
+				Exists: true,
+			},
 		},
 		Array: []*StructType{
 			{
 				A: 7,
 				B: "8",
 				C: 9,
+				Nested: &NestedStructType{
+					D:      3,
+					Exists: false,
+				},
 			},
 		},
 		IntArray: []int{10},
@@ -690,12 +704,20 @@ func TestView(t *testing.T) {
 			A: 4,
 			B: "5",
 			C: 6,
+			Nested: &NestedStructType{
+				D:      5,
+				Exists: true,
+			},
 		},
 		Array: []*StructType{
 			{
 				A: 7,
 				B: "8",
 				C: 9,
+				Nested: &NestedStructType{
+					D:      6,
+					Exists: false,
+				},
 			},
 		},
 		IntArray: []int{10},
