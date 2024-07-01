@@ -3,7 +3,6 @@ package server
 import (
 	"compress/gzip"
 	"fmt"
-	"log"
 	"net/http"
 	"runtime"
 	"sync"
@@ -210,7 +209,6 @@ func withDatasetMiddleware() func(http.Handler) http.Handler {
 			datasetID, exists := datasetIDFromParams(params)
 			if exists {
 				project := projectFromContext(ctx)
-				log.Printf("[mfudala] project %s", project.ID)
 				dataset := project.Dataset(datasetID)
 				if dataset == nil {
 					errorResponse(ctx, w, errNotFound(fmt.Sprintf("dataset %s is not found", datasetID)))
