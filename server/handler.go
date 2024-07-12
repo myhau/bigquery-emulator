@@ -403,10 +403,13 @@ func (h *uploadContentHandler) Handle(ctx context.Context, r *uploadContentReque
 	load := r.job.Content().Configuration.Load
 	tableRef := load.DestinationTable
 	dataset := r.project.Dataset(tableRef.DatasetId)
+	if dataset == nil {
+		return fmt.Errorf("dataset `%s` is not found", tableRef.DatasetId)
+	}
 	table := dataset.Table(tableRef.TableId)
 	if table == nil {
 		if load.CreateDisposition == "CREATE_NEVER" {
-			return fmt.Errorf("`%s` is not found", tableRef.TableId)
+			return fmt.Errorf("table `%s` is not found", tableRef.TableId)
 		}
 		if _, err := (&tablesInsertHandler{}).Handle(ctx, &tablesInsertRequest{
 			server:  r.server,
