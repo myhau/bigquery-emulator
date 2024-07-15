@@ -2580,6 +2580,10 @@ func createTableMetadata(ctx context.Context, tx *connection.Tx, server *Server,
 	table.CreationTime = now
 	table.LastModifiedTime = uint64(now)
 	table.Type = string(DefaultTableType) // TODO: need to handle other table types
+
+	// TODO: set these later
+	table.NumBytes = 0
+	table.NumRows = 0
 	if table.View != nil {
 		table.Type = string(ViewTableType)
 	}
