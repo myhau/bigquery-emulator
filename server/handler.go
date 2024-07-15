@@ -550,6 +550,20 @@ func (h *uploadContentHandler) Handle(ctx context.Context, r *uploadContentReque
 	if err := r.server.contentRepo.AddTableData(ctx, tx, tableRef.ProjectId, tableRef.DatasetId, tableDef); err != nil {
 		return err
 	}
+	tableContent, err = table.Content()
+	if err != nil {
+		return err
+	}
+	sizes, err := r.server.contentRepo.GetTableSizes(ctx, tx, r.project.ID, dataset.ID, table.ID)
+	if err != nil {
+		return err
+	}
+	tableContent.NumRows = sizes.NumberOfRows
+	tableContent.NumBytes = sizes.TotalSizeInBytes
+	err = table.UpdateTyped(ctx, tx.Tx(), tableContent)
+	if err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}
@@ -1648,6 +1662,23 @@ func (h *jobsInsertHandler) addQueryResultToDynamicDestinationTable(ctx context.
 	if err := r.server.contentRepo.AddTableData(ctx, tx, projectID, datasetID, tableDef); err != nil {
 		return fmt.Errorf("failed to add table data: %w", err)
 	}
+	tableContent, err := table.Content()
+	if err != nil {
+		return err
+	}
+	sizes, err := r.server.contentRepo.GetTableSizes(ctx, tx, r.project.ID, dataset.ID, table.ID)
+	if err != nil {
+		return err
+	}
+	tableContent.NumRows = sizes.NumberOfRows
+	tableContent.NumBytes = sizes.TotalSizeInBytes
+	err = table.UpdateTyped(ctx, tx.Tx(), tableContent)
+	if err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -2357,6 +2388,23 @@ func (h *tabledataInsertAllHandler) Handle(ctx context.Context, r *tabledataInse
 	if err := r.server.contentRepo.AddTableData(ctx, tx, r.project.ID, r.dataset.ID, tableDef); err != nil {
 		return nil, err
 	}
+	if err := tx.MetadataRepoMode(); err != nil {
+		return nil, err
+	}
+	table, err := r.table.Content()
+	if err != nil {
+		return nil, err
+	}
+	sizes, err := r.server.contentRepo.GetTableSizes(ctx, tx, r.project.ID, r.dataset.ID, r.table.ID)
+	if err != nil {
+		return nil, err
+	}
+	table.NumRows = sizes.NumberOfRows
+	table.NumBytes = sizes.TotalSizeInBytes
+	err = r.table.UpdateTyped(ctx, tx.Tx(), table)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -2580,6 +2628,10 @@ func createTableMetadata(ctx context.Context, tx *connection.Tx, server *Server,
 	table.CreationTime = now
 	table.LastModifiedTime = uint64(now)
 	table.Type = string(DefaultTableType) // TODO: need to handle other table types
+
+	// TODO: set these later
+	table.NumBytes = 0
+	table.NumRows = 0
 	if table.View != nil {
 		table.Type = string(ViewTableType)
 	}

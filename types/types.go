@@ -51,6 +51,7 @@ func (t *Table) ToBigqueryV2(projectID, datasetID string) *bigqueryv2.Table {
 			Fields: fields,
 		},
 		NumRows:          uint64(len(t.Data)),
+		NumBytes:         int64(len(t.Data)), // FIXME: placeholder
 		CreationTime:     now,
 		LastModifiedTime: uint64(now),
 	}

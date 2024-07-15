@@ -4,10 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"maps"
-
 	"github.com/goccy/go-json"
 	bigqueryv2 "google.golang.org/api/bigquery/v2"
+	"maps"
 )
 
 type Table struct {
@@ -30,6 +29,22 @@ func (t *Table) Update(ctx context.Context, tx *sql.Tx, metadata map[string]inte
 		t.metadata = mergedMetadata
 	}
 	return err
+}
+
+func (t *Table) UpdateTyped(ctx context.Context, tx *sql.Tx, table *bigqueryv2.Table) error {
+	encoded, err := json.Marshal(table)
+	if err != nil {
+		return fmt.Errorf("failed to encode metadata: %w", err)
+	}
+	var v map[string]interface{}
+	if err := json.Unmarshal(encoded, &v); err != nil {
+
+	}
+	err = t.repo.UpdateTable(ctx, tx, t, v)
+	if err == nil {
+		return err
+	}
+	return nil
 }
 
 func (t *Table) Insert(ctx context.Context, tx *sql.Tx) error {
