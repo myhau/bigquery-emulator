@@ -219,6 +219,32 @@ func (r *Repository) encodeSchemaField(field *bigqueryv2.TableFieldSchema) strin
 	return elem
 }
 
+type Sizes struct {
+	NumberOfRows     uint64
+	TotalSizeInBytes int64
+}
+
+func (r *Repository) GetTableSizes(ctx context.Context, tx *connection.Tx, projectID, datasetID, tableID string) (*Sizes, error) {
+	response, err := r.Query(
+		ctx,
+		tx,
+		projectID,
+		datasetID,
+		fmt.Sprintf("SELECT COUNT(*) as c FROM `%s`", tableID),
+		nil,
+	)
+	data, err := response.Rows[0].Data()
+	if err != nil {
+		return nil, err
+	}
+	rowCount := data["c"].(uint64)
+
+	return &Sizes{
+		NumberOfRows:     rowCount,
+		TotalSizeInBytes: int64(rowCount * 10), // TODO: dummy, change
+	}, nil
+}
+
 func (r *Repository) Query(ctx context.Context, tx *connection.Tx, projectID, datasetID, query string, params []*bigqueryv2.QueryParameter) (*internaltypes.QueryResponse, error) {
 	tx.SetProjectAndDataset(projectID, datasetID)
 	if err := tx.ContentRepoMode(); err != nil {
